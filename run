@@ -1,0 +1,2 @@
+#!/bin/bash
+g++ -std=c++17 -g -O0 -Wall -Wextra "$1.cpp" -o "$1" && ./"$1"
