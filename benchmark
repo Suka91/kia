@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+export LC_ALL=C
+executable="$1"
+shift
+
+total=0
+solved=0
+timeouts=0
+sum_time=0
+
+show_table() {
+    awk -v total="$total" -v solved="$solved" -v timeouts="$timeouts" \
+        -v sum="$sum_time" 'BEGIN {
+        average = total ? sprintf("%.2f s", (sum + 120 * timeouts) / total) : "N/A";
+        solved_average = solved ? sprintf("%.2f s", sum / solved) : "N/A";
+
+        printf "\nGraphs processed: %d\n", total;
+        print "\n| # solved | Avg. time | Avg. time on solved |";
+        print "|---:|---:|---:|";
+        printf "| %d | %s | %s |\n", solved, average, solved_average;
+    }'
+}
+
+trap 'exit 130' INT
+trap 'show_table >&2' EXIT
+
+for graph in "$@"; do
+    printf '%s\n' "$graph"
+    output=$(timeout --foreground 60s "$executable" "$graph")
+    status=$?
+
+    if [ "$status" -eq 0 ]; then
+        seconds=$(awk '$1 == "Time:" { print $2 }' <<< "$output")
+        sum_time=$(awk -v sum="$sum_time" -v time="$seconds" \
+            'BEGIN { printf "%.9f", sum + time }')
+        solved=$((solved + 1))
+        total=$((total + 1))
+        printf 'Completed: %s seconds\n' "$seconds"
+    elif [ "$status" -eq 124 ]; then
+        timeouts=$((timeouts + 1))
+        total=$((total + 1))
+        printf 'Timeout\n'
+    elif [ "$status" -eq 1 ]; then
+        printf 'Skipped\n'
+    else
+        exit "$status"
+    fi
+done
